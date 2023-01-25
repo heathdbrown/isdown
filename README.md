@@ -1,6 +1,7 @@
 # isdown
+> Uses python, rich, and click to check the status of a website.
 
-
+![Screenshot 2023-01-25 094210](https://user-images.githubusercontent.com/618460/214607921-f188bb8a-1291-4018-b206-0d5e3eabd991.png)
 
 -----
 
@@ -13,6 +14,7 @@
 
 ```console
 pip install isdown
+
 ```
 
 ## Running
