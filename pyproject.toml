@@ -25,6 +25,7 @@ classifiers = [
 ]
 dependencies = [
   "click",
+  "httpx",
   "rich"
 ]
 dynamic = ["version"]
