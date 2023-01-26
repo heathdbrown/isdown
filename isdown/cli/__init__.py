@@ -3,10 +3,14 @@
 # SPDX-License-Identifier: MIT
 import pathlib
 import time
-import click
+
+# import click
 import httpx
 from rich.console import Console
 from rich.table import Column, Table
+from rich.live import Live
+import asyncclick as click
+import anyio
 
 console = Console()
 
@@ -31,27 +35,32 @@ def read_file(file: str) -> list[str]:
     return lines
 
 
-def http_connect(site: str) -> tuple[str, str]:
+async def http_connect(site: str) -> tuple[str, str]:
+
     try:
-        status = httpx.get(site).status_code
-        if status in range(200, 400):
-            return site, "OK"
-        if status in [401, 403]:
-            return site, "Authentication or Authorization Needed"
-        if status in [400, 402, range(404, 500)]:
-            return site, "Client Error"
-        if status in range(500, 600):
-            return site, "Server Error"
-    except httpx.ConnectTimeout:
-        return site, "Timeout"
+        async with httpx.AsyncClient() as client:
+            r = await client.get(site)
     except httpx.ConnectError:
-        return site, "Down"
+        return site, "Connection Error"
+    except Exception as e:
+        return site, f"{type(e)}"
+
+    if not r:
+        return site, "Error"
+    if r.status_code in range(200, 400):
+        return site, "OK"
+    if r.status_code in [401, 403]:
+        return site, "Authentication or Authorization Needed"
+    if r.status_code in [400, 402, range(404, 500)]:
+        return site, "Client Error"
+    if r.status_code in range(500, 600):
+        return site, "Server Error"
 
 
 @isdown.command()
 @click.argument("sites", nargs=-1, required=False)
 @click.option("-i", "--input-file", "input_file", required=False)
-def check(sites, input_file):
+async def check(sites, input_file):
     if sites and input_file:
         isites = tuple(read_file(input_file))
         sites = sites + isites
@@ -63,7 +72,14 @@ def check(sites, input_file):
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Site", style="dim")
     table.add_column("Status")
-    with click.progressbar(sites) as click_sites:
+
+    with click.progressbar(
+        sites,
+    ) as click_sites:
         for site in click_sites:
-            table.add_row(*http_connect(site))
+            table.add_row(*await http_connect(site))
     console.print(table)
+
+
+if __name__ == "__main__":
+    check(_anyio_backend="trio")
