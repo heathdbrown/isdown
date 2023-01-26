@@ -12,7 +12,13 @@ from rich.live import Live
 import asyncclick as click
 import anyio
 
-console = Console()
+from time import sleep
+
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from rich.table import Table
+
 
 from ..__about__ import __version__
 
@@ -69,16 +75,41 @@ async def check(sites, input_file):
     elif sites and not input_file:
         sites = sites
 
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Site", style="dim")
-    table.add_column("Status")
+    # Liveprogess.py example
+    job_progress = Progress(
+        "{task.description}",
+        SpinnerColumn(),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+    )
 
-    with click.progressbar(
-        sites,
-    ) as click_sites:
-        for site in click_sites:
-            table.add_row(*await http_connect(site))
-    console.print(table)
+    for site in sites:
+        job_progress.add_task(site, total=100)
+
+    total = sum(task.total for task in job_progress.tasks)
+    overall_progress = Progress()
+    overall_task = overall_progress.add_task("all jobs", total=int(total))
+
+    progress_table = Table.grid()
+    progress_table.add_row(
+        Panel.fit(
+            overall_progress,
+            title="Overall Progress",
+            border_style="green",
+            padding=(2, 2),
+        ),
+        Panel.fit(job_progress, title="[b]Jobs", border_style="red", padding=(1, 2)),
+    )
+
+    with Live(progress_table, refresh_per_second=10):
+        while not overall_progress.finished:
+            sleep(0.1)
+            for job in job_progress.tasks:
+                if not job.finished:
+                    job_progress.advance(job.id)
+
+            completed = sum(task.completed for task in job_progress.tasks)
+            overall_progress.update(overall_task, completed=completed)
 
 
 if __name__ == "__main__":
